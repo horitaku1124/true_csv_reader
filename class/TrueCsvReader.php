@@ -11,6 +11,7 @@ class TrueCsvReader {
     protected $handle;
     protected $endOfLine;
     protected $delimiter;
+    protected $fileEncode;
     protected $buffer;
     protected $bufferPoint;
     public function __construct($filePath, $readAs = self::WINDOWS_FORMAT)
@@ -19,15 +20,18 @@ class TrueCsvReader {
         switch($readAs) {
             case self::WINDOWS_FORMAT:
                 $this->endOfLine = "\r\n";
-                $this->endOfLine = ",";
+                $this->delimiter = ",";
+                $this->fileEncode = "sjis";
                 break;
             case self::MAC_FORMAT:
                 $this->endOfLine = "\r";
-                $this->endOfLine = ",";
+                $this->delimiter = ",";
+                $this->fileEncode = "sjis";
                 break;
             default:
                 $this->endOfLine = "\r\n";
-                $this->endOfLine = ",";
+                $this->delimiter = ",";
+                $this->fileEncode = "sjis";
                 break;
         }
         $this->handle = fopen($this->filePath, "rb");
@@ -40,10 +44,35 @@ class TrueCsvReader {
         while(true) {
             $buffer = fread($this->handle, self::BUFFER_SIZE);
             if($buffer === false || $buffer === "") break;
-
-            // TODO implement later.
-
-            yield $buffer;
+            $start = 0;
+            $index = 0;
+            $row = [];
+            for($i = 0;$i < strlen($buffer);$i++) {
+                $c = $buffer[$i];
+                if($c == "\r") {
+                    $col = substr($buffer, $start, $index - $start);
+                    $row2 = $row;
+                    $row2[] = $col;
+                    $index = $i + 1;
+                    $i++;
+                    $start = $index;
+                    $row = [];
+                    yield $row2;
+                }
+                if($c == $this->delimiter) {
+                    $col = substr($buffer, $start, $index - $start);
+                    $row[] = $col;
+                    $index = $i + 1;
+                    $i++;
+                    $start = $index;
+                }
+                $index++;
+            }
+            if($start < strlen($buffer) - 1) {
+                $col = substr($buffer, $start);
+                $row[] = $col;
+                yield $row;
+            }
         }
     }
 
